@@ -1,0 +1,166 @@
+[
+    {
+        "content": "FL Studio Mobile (FLM) のコアエンジンは libFLM.so (約26MB ARM64) で構成される。CSequencer がDAWの心臓部 (VTable: 0xc6e968, 256個の仮想関数)。BPM管理、再生制御、チャンネル管理を担当。CChannelRack (VTable: 0xc6e4b8) がオーディオミキシング、ルーティング、モジュール管理を行う。",
+        "category": "flm_architecture",
+        "importance": 5.0,
+        "metadata": {
+            "source": "reverse_engineering",
+            "component": "core_engine",
+            "verified": true
+        }
+    },
+    {
+        "content": "FLM の主要ホックターゲット: CSequencer::StartPlaying (0xa1ea6c) — 再生開始、CSequencer::StopPlaying (0xa18d54) — 再生停止、Engine_SetTempo (0xc36860) — BPM変更、CChannelRack::HandleSequencerEvent (0xc2bea0) — イベントディスパッチャー、Engine_Initialize (0xb5f858) — エンジン初期化。これらのフックにより外部からDAW操作が可能。",
+        "category": "flm_hook_targets",
+        "importance": 5.0,
+        "metadata": {
+            "source": "reverse_engineering",
+            "component": "frida_hooks",
+            "verified": true
+        }
+    },
+    {
+        "content": "FLM の内部シンセサイザー: GMSynth (General MIDI/マルチティンバー) — Init: 0x3a4f80, Render: 0x3a5c10。MGSynth (高性能 Magic Synth) — Init: 0x3b8d00, Render: 0x3b9a20。AudioManager JNI: nativeSetSampleRate: 0xad2fac, nativeSetBufferSize: 0xad2f90。サンプルレートとバッファサイズの動的変更が可能。",
+        "category": "flm_synthesizers",
+        "importance": 4.0,
+        "metadata": {
+            "source": "reverse_engineering",
+            "component": "audio_engine",
+            "verified": true
+        }
+    },
+    {
+        "content": "FLM のシーケンサーイベント構造: SequencerNoteEvent (ノートOn/Off、ピッチ、ベロシティ)、SequencerParamEvent (オートメーション/CCデータ)、SequencerClipEvent (クリップトリガー)、SequencerLoopEvent (ループポイント管理)、SequencerSlideEvent (ポリフォニック・ノートスライド — FL Studio固有)、SequencerColorEvent (UIトラックカラーリング)。lock-free dispatch via moodycamel::ConcurrentQueue。",
+        "category": "flm_event_system",
+        "importance": 4.5,
+        "metadata": {
+            "source": "reverse_engineering",
+            "component": "sequencer",
+            "verified": true
+        }
+    },
+    {
+        "content": "FLM トランスポート制御フロー: Engine_TransportChanged (0xa9456c) がマスターディスパッチャー。StudioUI::TransportPlay (0xa90d38) → StopPlaying → StartPlaying。StudioUI::TransportRecord (0xa90da0) → StartRecording。CTimelineControl::ControlValue (0xaccaf4) → StartPlaying。MIDI_NoteOn (0xa20ba8) / MIDI_NoteOff (0xa20c18) → CSequencer::RecordKeyPress。MIDI_CC (0xa20c50) / MIDI_PitchWheel (0xa20d84) → CSequencer::RecordParameter。",
+        "category": "flm_transport",
+        "importance": 4.5,
+        "metadata": {
+            "source": "reverse_engineering",
+            "component": "transport_control",
+            "verified": true
+        }
+    },
+    {
+        "content": "CSequencer の主要メソッドマップ: Initialize (0xa0c1f0)、ResetState (0xa0c2e4)、SetPlayLoop (0xa0c62c)、GetState (0xa0c6b0)、CreateChannel (0xa116a8)、ResetSongToDefault (0xa18908)、LoadSong (0xa189a0)、StopPlaying (0xa18d54)、SetSongBeat (0xa18f74)、StartPlaying (0xa1ea6c)。BPMオフセットは this+0x28 と推定。",
+        "category": "flm_csequencer",
+        "importance": 5.0,
+        "metadata": {
+            "source": "reverse_engineering",
+            "component": "csequencer",
+            "verified": true,
+            "vtable": "0xc6e968",
+            "entry_count": 256
+        }
+    },
+    {
+        "content": "Psytrance制作のFLMパラメータガイド: BPM 138-155、キーはA minor/D minorが定番。リードシンセ: 3x Osc (SuperSaw)、filter_cutoff: 0.25-0.45、filter_resonance: 0.5-0.7、attack_ms: 1-5、release_ms: 150-300。ベースライン: SquareWave、filter_cutoff: 0.1-0.3 (LFOオートメーション)。キック: サイドチェインコンプ 4:1比率。構成: intro 8小節 → buildup 16小節 → drop 16小節 → breakdown 8小節 → drop2 16小節 → outro 8小節 (合計72小節)。",
+        "category": "genre_psytrance",
+        "importance": 4.0,
+        "metadata": {
+            "source": "production_knowledge",
+            "genre": "psytrance",
+            "daw": "flm"
+        }
+    },
+    {
+        "content": "Techno制作のFLMパラメータガイド: BPM 125-140、4つ打ちキック必須。キック: decay 200-400ms、pitch envelope -2octave。クローズドハイハット: 8分音符or16分音符。オープンハイハット: オフビート。クラップ/スネア: 2拍と4拍。ベースライン: シンプルなサイン波 or 三角波、filter_cutoff: 0.15-0.35。リバーブ: size 0.3-0.5、dry/wet 20-30%。ディレイ: 3/16 or 1/8 (BPM同期)。",
+        "category": "genre_techno",
+        "importance": 4.0,
+        "metadata": {
+            "source": "production_knowledge",
+            "genre": "techno",
+            "daw": "flm"
+        }
+    },
+    {
+        "content": "House制作のFLMパラメータガイド: BPM 118-132、キー: C major/G majorが多い。4つ打ちキック、オフビートハイハット、2-4拍スナップクラップ。ベース: ファンキーなシンセベース (Saw + Sub)、filter_cutoff: 0.3-0.5 with LFO。コード: マイナーセブンス、ナインスコードでディープ感。ボーカルサンプル: リバーブ heavy (size 0.6-0.8)。サイドチェイン: 穏やか 2:1比率。",
+        "category": "genre_house",
+        "importance": 3.5,
+        "metadata": {
+            "source": "production_knowledge",
+            "genre": "house",
+            "daw": "flm"
+        }
+    },
+    {
+        "content": "Trap制作のFLMパラメータガイド: BPM 130-170 (ハーフタイムフィール 65-85)。808キック: ロングディケイ (1-3秒)、ピッチスライド。ハイハット: 高速トリプレットロール (1/32音符)、ベロシティバリエーション。スネア/クラップ: ハードヒット、リバーブtail。ベース: 808サブベース、distortion付き。Hi-hat pattern: [1,1,0,1,1,0,1,1,1,1,0,1,1,0,1,1] (16ステップ)。",
+        "category": "genre_trap",
+        "importance": 3.5,
+        "metadata": {
+            "source": "production_knowledge",
+            "genre": "trap",
+            "daw": "flm"
+        }
+    },
+    {
+        "content": "Drum & Bass制作のFLMパラメータガイド: BPM 160-180、ブレイクビーツ基盤。キック+スネアの「Two-Step」パターンが基本。ベース: ニューロベース (FM合成 or WaveTable)、filter_cutoff: 0.1-0.8 (激しいオートメーション)、filter_resonance: 0.6-0.9。リード: SuperSaw or FM、attack < 5ms。リバーブ: 短め (size 0.2-0.3)。サブベース: サイン波、キックとの周波数分離が重要 (ハイパスフィルター 80Hz)。",
+        "category": "genre_dnb",
+        "importance": 3.5,
+        "metadata": {
+            "source": "production_knowledge",
+            "genre": "drum_and_bass",
+            "daw": "flm"
+        }
+    },
+    {
+        "content": "FLM の PairIP アンチタンパー保護: libpairipcore.so がインテグリティチェックを行う。バイパス戦略: strstr フックで 'frida', 'gum-js' を隠蔽。ライセンスブロッカー: libFLM.so は LicenseActivity 後にのみロードされる。ライセンスなしではエンジンマッピング前にクラッシュ。解決策: OnePlus 15 実機から shared_prefs を移植するのが最も確実。",
+        "category": "flm_security",
+        "importance": 3.0,
+        "metadata": {
+            "source": "reverse_engineering",
+            "component": "anti_tamper",
+            "verified": true
+        }
+    },
+    {
+        "content": "FLM ヒューリスティック分類ロジック: FX/reverb/delay/compressor/eq/filter → Effect系、synth/oscillator/voice/adsr → Synthesizer系、sequencer/song/bpm/tempo/play/stop → Sequencer系、channel/rack/mixer/route/bus → Channel Rack系、control/button/slider/knob/touch → UI Control系。25,613関数のうち約52%を0.1秒で自動分類可能。",
+        "category": "flm_classification",
+        "importance": 3.5,
+        "metadata": {
+            "source": "reverse_engineering",
+            "component": "heuristic_engine",
+            "functions_total": 25613
+        }
+    },
+    {
+        "content": "FLM クラス構造 (Ghidra解析): 453個のVTable、294個のクラスを特定。主要クラス: CSequencer (DAW心臓部)、CChannelRack (ミキシング)、CMobileUIControl (VTable: 0xc5d5e0 — UI基盤)、CFileManager (VTable: 0xc5e2a0 — プロジェクト/アセット永続化)。コールグラフ: 53,741エッジ (call_graph.db)。成果物: ghidra_analysis_v3.json (25,613関数)、flm_structs.h (50+クラス定義)。",
+        "category": "flm_class_structure",
+        "importance": 4.5,
+        "metadata": {
+            "source": "reverse_engineering",
+            "component": "class_hierarchy",
+            "vtables_found": 453,
+            "classes_found": 294,
+            "call_graph_edges": 53741
+        }
+    },
+    {
+        "content": "DirectWave プリセット形式 (DWP/DWPR): FLM のサンプラー用フォーマット。TLVベースのバイナリ構造。ゾーンフィールドマッピング完了。サンプルデータはWAV/FLAC埋め込み。マルチサンプル、ベロシティレイヤー、ラウンドロビン対応。プリセットパラメータ: ADSR、フィルター、LFO、エフェクト (リバーブ、ディレイ) をバイナリエンコード。",
+        "category": "flm_directwave",
+        "importance": 3.5,
+        "metadata": {
+            "source": "reverse_engineering",
+            "component": "directwave_sampler",
+            "format": "dwp/dwpr"
+        }
+    },
+    {
+        "content": "FLM AI制御のRPCインターフェース: Frida経由で高レベルラッパー play(), setBPM(), noteOn() を提供。AIエージェントがエンジンを直接制御可能。VTable ポインタスキャン: rw- メモリ領域でVTableポインタをスキャンしてインスタンスを発見。Opportunistic Capture: クラスメソッドをフックして this ポインタを x0 レジスタからキャプチャ。",
+        "category": "flm_ai_control",
+        "importance": 5.0,
+        "metadata": {
+            "source": "reverse_engineering",
+            "component": "rpc_interface",
+            "verified": true
+        }
+    }
+]
