@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: ankane/pgvector:latest
+    environment:
+      POSTGRES_DB: autoforge
+      POSTGRES_USER: autoforge
+      POSTGRES_PASSWORD: autoforge
+    ports:
+      - "5433:5432"  # 5433 to avoid conflict with existing PG
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autoforge"]
+      interval: 10s
+
+  neo4j:
+    image: neo4j:5-community
+    environment:
+      NEO4J_AUTH: neo4j/password123
+    ports:
+      - "7474:7474"   # browser
+      - "7687:7687"   # bolt
+    volumes:
+      - neo4jdata:/data
+
+  app:
+    build: .
+    ports:
+      - "8100:8000"  # 8100 to avoid conflict
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_started
+    volumes:
+      - ./src:/app/src
+
+volumes:
+  pgdata:
+  neo4jdata:

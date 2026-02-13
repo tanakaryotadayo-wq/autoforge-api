@@ -1,0 +1,43 @@
+[
+    {
+        "content": "遺品整理・空き家整理の繁忙期は3月〜5月（引越しシーズン）と9月〜11月（相続手続きシーズン）。この時期はCPAが上昇する傾向があるため、予算を20-30%増加させることを推奨。",
+        "category": "seasonality",
+        "importance": 3.0,
+        "metadata": {
+            "region": "all",
+            "source": "sample"
+        }
+    },
+    {
+        "content": "除外すべき定番キーワード: 求人, バイト, 資格, 開業, フランチャイズ, 年収, 給料。これらは求職者の検索であり、サービス利用者ではない。",
+        "category": "exclusion_keywords",
+        "importance": 3.0,
+        "metadata": {
+            "source": "sample"
+        }
+    },
+    {
+        "content": "雨天時は遺品整理・空き家整理の検索CVRが10-15%低下する傾向がある。雨天予報の日は入札を10%下げ、晴天日に予算を集中させる戦略が有効。",
+        "category": "weather_correlation",
+        "importance": 2.5,
+        "metadata": {
+            "source": "sample"
+        }
+    },
+    {
+        "content": "高CVRキーワード例: 遺品整理 見積もり, 空き家片付け 業者, 生前整理 費用, ゴミ屋敷 清掃。これらは具体的な行動意図を持つキーワードであり、CPAが低い傾向。",
+        "category": "high_cvr_keywords",
+        "importance": 3.0,
+        "metadata": {
+            "source": "sample"
+        }
+    },
+    {
+        "content": "遺品整理の平均CPAは地域により大きく異なる。都市部（東京・大阪）: 8,000-15,000円、地方: 5,000-10,000円。都市部では競合が多いため、差別化キーワード（エリア名+遺品整理）が有効。",
+        "category": "cpa_benchmarks",
+        "importance": 3.0,
+        "metadata": {
+            "source": "sample"
+        }
+    }
+]
