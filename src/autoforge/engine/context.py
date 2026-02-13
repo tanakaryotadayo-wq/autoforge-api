@@ -333,6 +333,48 @@ class ContextEngine:
   "summary": "全体の方針要約",
   "risk_assessment": "リスク評価"
 }""",
+            "music_production": """あなたはプロの音楽プロデューサー兼サウンドデザイナーです。
+FL Studio Mobile (FLM) のパラメータを熟知しており、ジャンル特有の制作手法に精通しています。
+
+ナレッジベースの解析データを最優先で参照し、具体的なDAWパラメータ値で提案してください。
+
+対応ジャンル: Psytrance, Techno, Acid, House, Drum & Bass, Ambient, Lo-Fi
+
+出力形式（JSON）:
+{
+  "recommendations": [
+    {
+      "type": "synth_patch|drum_pattern|effect_chain|arrangement|mixing|sound_design",
+      "action": "具体的なアクション",
+      "reason": "根拠（ジャンル理論・KB知識）",
+      "expected_impact": "想定効果（聴覚的変化）",
+      "priority": "high|medium|low",
+      "specific_values": {
+        "bpm": 145,
+        "key": "A minor",
+        "synth": "3x Osc",
+        "waveform": "saw",
+        "filter_cutoff": 0.35,
+        "filter_resonance": 0.6,
+        "attack_ms": 5,
+        "release_ms": 200,
+        "reverb_size": 0.4,
+        "delay_time_ms": 375,
+        "sidechain_ratio": "4:1"
+      }
+    }
+  ],
+  "track_structure": {
+    "bpm": 145,
+    "key": "A minor",
+    "time_signature": "4/4",
+    "sections": ["intro_8bar", "buildup_16bar", "drop_16bar", "breakdown_8bar", "drop2_16bar", "outro_8bar"],
+    "total_bars": 72,
+    "channels": ["kick", "bass", "lead", "pad", "hihat", "clap", "fx"]
+  },
+  "summary": "制作方針の要約",
+  "genre_notes": "ジャンル固有の注意点"
+}""",
         }
         return prompts.get(
             domain,
@@ -387,6 +429,52 @@ class ContextEngine:
                         warnings.append(
                             f"予算変更率{budget_change}%は急激です（推奨±30%以内）"
                         )
+
+        elif domain == "music_production":
+            # Genre-specific BPM ranges
+            bpm_ranges = {
+                "psytrance": (138, 155), "techno": (125, 150),
+                "acid": (120, 140), "house": (118, 132),
+                "drum_and_bass": (160, 180), "ambient": (60, 100),
+                "lo-fi": (70, 95),
+            }
+
+            track = proposal.get("track_structure", {})
+            bpm = track.get("bpm")
+
+            # Rule 1: BPM sanity check
+            if bpm is not None:
+                if bpm < 30 or bpm > 300:
+                    errors.append(f"BPM {bpm} は範囲外です（30-300）")
+
+            # Rule 2: Check specific_values on recommendations
+            for r in recommendations:
+                vals = r.get("specific_values", {})
+
+                # Filter cutoff should be 0.0 - 1.0
+                cutoff = vals.get("filter_cutoff")
+                if cutoff is not None and not (0.0 <= cutoff <= 1.0):
+                    errors.append(f"filter_cutoff {cutoff} は 0.0-1.0 の範囲外です")
+
+                # Resonance should be 0.0 - 1.0
+                reso = vals.get("filter_resonance")
+                if reso is not None and not (0.0 <= reso <= 1.0):
+                    errors.append(f"filter_resonance {reso} は 0.0-1.0 の範囲外です")
+
+                # Reverb size should be 0.0 - 1.0
+                reverb = vals.get("reverb_size")
+                if reverb is not None and not (0.0 <= reverb <= 1.0):
+                    warnings.append(f"reverb_size {reverb} は 0.0-1.0 の範囲外です")
+
+            # Rule 3: Track structure should have sections
+            sections = track.get("sections", [])
+            if track and not sections:
+                warnings.append("track_structure にセクション定義がありません")
+
+            # Rule 4: Channel count sanity
+            channels = track.get("channels", [])
+            if len(channels) > 16:
+                warnings.append(f"チャンネル数 {len(channels)} は FLM の制限を超える可能性があります")
 
         return AuditResult(
             is_valid=len(errors) == 0,
