@@ -13,12 +13,12 @@ COPY src/ ./src/
 RUN uv pip install --system --no-cache .
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8698
 
 # Run with Granian (not Uvicorn)
 CMD ["granian", \
     "--interface", "asgi", \
     "--host", "0.0.0.0", \
-    "--port", "8000", \
+    "--port", "8698", \
     "--workers", "2", \
     "autoforge.main:app"]

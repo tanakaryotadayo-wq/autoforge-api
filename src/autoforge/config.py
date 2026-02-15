@@ -60,7 +60,7 @@ class Settings(BaseSettings):
 
     # ── Server ──
     host: str = "0.0.0.0"
-    port: int = 8000
+    port: int = 8698
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
