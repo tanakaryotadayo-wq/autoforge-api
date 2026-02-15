@@ -70,3 +70,37 @@ class HealthResponse(BaseModel):
     status: str
     components: dict[str, str] = Field(default_factory=dict)
     version: str = "7.0.0"
+
+
+class DomainInfo(BaseModel):
+    id: str
+    description: str
+
+
+class DomainsResponse(BaseModel):
+    domains: list[DomainInfo]
+
+
+class StatsResponse(BaseModel):
+    tenant_id: str
+    total_facts: int
+    total_proposals: int
+    accepted_proposals: int
+    acceptance_rate: float
+
+
+class ProposalHistoryItem(BaseModel):
+    id: str
+    domain: str
+    user_data: dict[str, Any]
+    proposal: dict[str, Any]
+    audit_result: dict[str, Any]
+    accepted: bool | None = None
+    created_at: str | None = None
+    feedback_at: str | None = None
+
+
+class ProposalsHistoryResponse(BaseModel):
+    proposals: list[ProposalHistoryItem]
+    limit: int
+    offset: int

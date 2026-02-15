@@ -9,6 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from autoforge.domains import audit_proposal, list_domains
 from autoforge.engine.context import ContextEngine
 from autoforge.models import (
     AuditResult,
@@ -219,3 +220,93 @@ class TestEngineWithMocks:
             domain="custom_domain",
         )
         assert result["audit"].is_valid  # unknown domain passes
+
+
+class TestDomainRegistry:
+    """Test domain registry and domain-specific audit dispatch."""
+
+    def test_list_domains_contains_expected(self):
+        domains = list_domains()
+        ids = {d["id"] for d in domains}
+        assert "sales" in ids
+        assert "customer_support" in ids
+
+    def test_sales_audit_rejects_invalid_discount(self):
+        proposal = {
+            "recommendations": [
+                {
+                    "type": "pricing",
+                    "action": "大幅値引き",
+                    "specific_values": {"discount_max_percent": 60},
+                }
+            ]
+        }
+        result = audit_proposal(proposal, "sales")
+        assert not result.is_valid
+        assert any("上限40%" in err for err in result.errors)
+
+    def test_customer_support_audit_rejects_bad_escalation(self):
+        proposal = {
+            "recommendations": [
+                {
+                    "type": "escalation",
+                    "action": "L5へエスカレーション",
+                    "specific_values": {"escalation_level": 5},
+                }
+            ],
+            "ticket_analysis": {"urgency": "high", "sentiment": "angry"},
+        }
+        result = audit_proposal(proposal, "customer_support")
+        assert not result.is_valid
+        assert any("範囲外" in err for err in result.errors)
+
+
+class TestMockPgVectorDB:
+    """Test newly added mock DB business-layer methods."""
+
+    @pytest.mark.anyio
+    async def test_get_stats(self, mock_db):
+        await mock_db.upsert(
+            "00000000-0000-0000-0000-000000000001",
+            "fact",
+            [0.1, 0.2],
+            {"tenant_id": "tenant-a"},
+        )
+        await mock_db.store_proposal(
+            proposal_id="p1",
+            tenant_id="tenant-a",
+            domain="sales",
+            user_data={"lead": "A"},
+            proposal={"recommendations": []},
+            audit_result={"is_valid": True},
+        )
+        await mock_db.update_feedback("p1", True)
+
+        stats = await mock_db.get_stats("tenant-a")
+        assert stats["tenant_id"] == "tenant-a"
+        assert stats["total_facts"] == 1
+        assert stats["total_proposals"] == 1
+        assert stats["accepted_proposals"] == 1
+
+    @pytest.mark.anyio
+    async def test_get_proposals_history(self, mock_db):
+        await mock_db.store_proposal(
+            proposal_id="p1",
+            tenant_id="tenant-a",
+            domain="sales",
+            user_data={"lead": "A"},
+            proposal={"recommendations": []},
+            audit_result={"is_valid": True},
+        )
+        await mock_db.store_proposal(
+            proposal_id="p2",
+            tenant_id="tenant-a",
+            domain="customer_support",
+            user_data={"ticket": "B"},
+            proposal={"recommendations": []},
+            audit_result={"is_valid": True},
+        )
+
+        history = await mock_db.get_proposals_history("tenant-a", limit=1, offset=1)
+        assert len(history) == 1
+        assert history[0]["tenant_id"] == "tenant-a"

@@ -39,6 +39,13 @@ class VectorDB(Protocol):
         accepted: bool,
         performance_after: dict[str, Any] | None = None,
     ) -> bool: ...
+    async def get_stats(self, tenant_id: str) -> dict[str, Any]: ...
+    async def get_proposals_history(
+        self,
+        tenant_id: str,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]: ...
 
 
 @runtime_checkable

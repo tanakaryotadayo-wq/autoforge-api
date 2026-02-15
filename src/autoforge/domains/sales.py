@@ -47,7 +47,15 @@ SYSTEM_PROMPT = """あなたはトップ営業コンサルタントです。
 
 
 def audit(proposal: dict[str, Any]) -> AuditResult:
-    """ECK-lite audit for sales proposals."""
+    """Validate sales proposals with business safety checks.
+
+    Rules:
+    - `discount_max_percent` must be `<= 40`.
+    - `win_probability_percent` must be between `0` and `100`.
+    - `customer_analysis` should be included (warning if missing).
+    - At least one `follow_up` recommendation is expected.
+    - Missing `specific_values` is treated as warning.
+    """
     errors: list[str] = []
     warnings: list[str] = []
     recommendations = proposal.get("recommendations", [])

@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Wait for PostgreSQL to be ready, then run init_db."""
+"""Wait for PostgreSQL to be ready, then run init_db.
+
+Usage:
+    uv run python scripts/wait_for_db.py
+
+This is intended for container startup where PostgreSQL may not be ready yet.
+The script waits with retries against `postgres:5432`, then executes `init_db`.
+"""
 
 import asyncio
 import sys
@@ -27,10 +34,10 @@ async def wait_and_init():
         sys.exit(1)
 
     # Run init_db
-    from init_db import init_db
-
     # Override DSN for Docker network
     import os
+
+    from init_db import init_db
 
     os.environ["DATABASE_URL"] = dsn
     await init_db()

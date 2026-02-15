@@ -46,6 +46,10 @@ class Settings(BaseSettings):
 
     # ── Memory ──
     max_history_turns: int = 10
+    max_proposals_history: int = 20
+
+    # ── Domain ──
+    default_domain: str = "ad_optimization"
 
     # ── Cleanup ──
     cleanup_days_unused: int = 30

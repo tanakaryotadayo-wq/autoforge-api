@@ -47,7 +47,15 @@ SYSTEM_PROMPT = """あなたはカスタマーサポートの品質管理エキ�
 
 
 def audit(proposal: dict[str, Any]) -> AuditResult:
-    """ECK-lite audit for customer support proposals."""
+    """Validate customer-support proposals with CS quality rules.
+
+    Rules:
+    - `escalation_level` must be in range `0..3`.
+    - `csat_target` must be between `0.0` and `5.0`.
+    - `estimated_resolution_minutes` must be non-negative.
+    - `ticket_analysis` should be present (warning if missing).
+    - High urgency/angry sentiment should include `escalation` recommendation.
+    """
     errors: list[str] = []
     warnings: list[str] = []
     recommendations = proposal.get("recommendations", [])

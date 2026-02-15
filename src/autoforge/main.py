@@ -33,12 +33,16 @@ from .config import settings
 from .engine.context import ContextEngine
 from .logging import setup_logging
 from .models import (
+    DomainsResponse,
     FeedbackRequest,
     HealthResponse,
     LearnRequest,
+    ProposalHistoryItem,
+    ProposalsHistoryResponse,
     ProposeRequest,
     ProposeResponse,
     QueryRequest,
+    StatsResponse,
 )
 
 logger = structlog.get_logger()
@@ -299,7 +303,7 @@ async def trigger_cleanup(user_id: str = Depends(get_current_user)):
 # ── Business Layer ──
 
 
-@app.get("/v1/domains")
+@app.get("/v1/domains", response_model=DomainsResponse)
 async def list_domains():
     """List all available domains with descriptions."""
     from .domains import list_domains as get_domains
@@ -307,21 +311,33 @@ async def list_domains():
     return {"domains": get_domains()}
 
 
-@app.get("/v1/stats")
+@app.get("/v1/stats", response_model=StatsResponse)
 async def tenant_stats(tenant_id: str = Depends(get_tenant_id)):
     """Get tenant-level statistics."""
     db: PgVectorDB = app.state.db
-    stats = await db.get_stats(tenant_id)
-    return stats
+    try:
+        stats = await db.get_stats(tenant_id)
+    except Exception as exc:
+        logger.error("stats_fetch_failed", tenant=tenant_id, error=str(exc))
+        raise HTTPException(503, "Database temporarily unavailable") from None
+    return StatsResponse(**stats)
 
 
-@app.get("/v1/proposals/history")
+@app.get("/v1/proposals/history", response_model=ProposalsHistoryResponse)
 async def proposals_history(
-    limit: int = 20,
+    limit: int = settings.max_proposals_history,
     offset: int = 0,
     tenant_id: str = Depends(get_tenant_id),
 ):
     """Get paginated proposal history for the tenant."""
     db: PgVectorDB = app.state.db
-    proposals = await db.get_proposals_history(tenant_id, limit=limit, offset=offset)
-    return {"proposals": proposals, "limit": limit, "offset": offset}
+    try:
+        proposals = await db.get_proposals_history(tenant_id, limit=limit, offset=offset)
+    except Exception as exc:
+        logger.error("proposal_history_fetch_failed", tenant=tenant_id, error=str(exc))
+        raise HTTPException(503, "Database temporarily unavailable") from None
+    return ProposalsHistoryResponse(
+        proposals=[ProposalHistoryItem(**p) for p in proposals],
+        limit=limit,
+        offset=offset,
+    )
