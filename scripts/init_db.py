@@ -12,7 +12,7 @@ load_dotenv()
 async def init_db():
     dsn = os.getenv(
         "DATABASE_URL",
-        "postgresql://autoforge:autoforge@localhost:5432/autoforge",
+        "postgresql://autoforge:autoforge@localhost:5433/autoforge",
     )
     conn = await asyncpg.connect(dsn)
 
@@ -30,11 +30,17 @@ async def init_db():
         )
     """)
 
-    # IVFFlat index for cosine similarity
+    # HNSW index for cosine similarity (better quality than IVFFlat, no list tuning)
     await conn.execute("""
-        CREATE INDEX IF NOT EXISTS documents_vector_idx
+        CREATE INDEX IF NOT EXISTS documents_vector_hnsw_idx
         ON documents
-        USING ivfflat (vector vector_cosine_ops)
+        USING hnsw (vector vector_cosine_ops)
+        WITH (m = 16, ef_construction = 64)
+    """)
+
+    # Drop old IVFFlat index if it exists
+    await conn.execute("""
+        DROP INDEX IF EXISTS documents_vector_idx
     """)
 
     # Metadata GIN index for tenant/user filtering
@@ -49,14 +55,33 @@ async def init_db():
         CREATE TABLE IF NOT EXISTS proposals (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             tenant_id TEXT NOT NULL DEFAULT 'default',
+            domain TEXT NOT NULL DEFAULT 'ad_optimization',
+            user_data JSONB NOT NULL DEFAULT '{}',
             proposal JSONB NOT NULL,
+            audit_result JSONB NOT NULL DEFAULT '{}',
             accepted BOOLEAN DEFAULT NULL,
             performance_after JSONB DEFAULT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            feedback_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
         )
     """)
 
-    print("✅ Database initialized (documents + proposals tables)")
+    # Index for querying proposals by tenant
+    await conn.execute("""
+        CREATE INDEX IF NOT EXISTS proposals_tenant_idx
+        ON proposals (tenant_id, created_at DESC)
+    """)
+
+    # Index for finding proposals awaiting feedback
+    await conn.execute("""
+        CREATE INDEX IF NOT EXISTS proposals_feedback_pending_idx
+        ON proposals (accepted)
+        WHERE accepted IS NULL
+    """)
+
+    print("✅ Database initialized:")
+    print("   - documents table (HNSW index)")
+    print("   - proposals table (tenant + feedback indexes)")
     await conn.close()
 
 

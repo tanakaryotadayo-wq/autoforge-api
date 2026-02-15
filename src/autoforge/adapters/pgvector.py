@@ -1,15 +1,18 @@
 """
 pgvector adapter — PostgreSQL + pgvector for RAG vector search.
-Implements VectorDB protocol.
+Implements VectorDB protocol. Wired with Prometheus metrics.
 """
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from typing import Any
 
 import asyncpg
 import structlog
+
+from .metrics import vector_search_duration, vector_search_total, vector_upsert_total
 
 logger = structlog.get_logger()
 
@@ -53,6 +56,7 @@ class PgVectorDB:
                 vector_str,
                 metadata_json,
             )
+        vector_upsert_total.inc()
 
     async def search(
         self,
@@ -61,6 +65,7 @@ class PgVectorDB:
         filter_metadata: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         vector_str = json.dumps(vector)
+        start = time.time()
 
         # Build filter clause for tenant isolation
         where_clauses = []
@@ -87,6 +92,13 @@ class PgVectorDB:
                 """,
                 *params,
             )
+
+        duration = time.time() - start
+        tenant = "unknown"
+        if filter_metadata and "tenant_id" in filter_metadata:
+            tenant = filter_metadata["tenant_id"]
+        vector_search_total.labels(tenant=tenant).inc()
+        vector_search_duration.observe(duration)
 
         return [
             {
@@ -144,3 +156,55 @@ class PgVectorDB:
             deleted = int(result.split()[-1]) if result else 0
             logger.info("cleanup_completed", deleted=deleted)
             return deleted
+
+    # ── Proposal storage (for feedback learning) ──
+
+    async def store_proposal(
+        self,
+        proposal_id: str,
+        tenant_id: str,
+        domain: str,
+        user_data: dict[str, Any],
+        proposal: dict[str, Any],
+        audit_result: dict[str, Any],
+    ) -> None:
+        """Store a generated proposal for future feedback tracking."""
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO proposals (id, tenant_id, domain, user_data, proposal, audit_result)
+                VALUES ($1::uuid, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb)
+                ON CONFLICT (id) DO UPDATE SET
+                    proposal = EXCLUDED.proposal,
+                    audit_result = EXCLUDED.audit_result
+                """,
+                uuid.UUID(proposal_id),
+                tenant_id,
+                domain,
+                json.dumps(user_data, ensure_ascii=False),
+                json.dumps(proposal, ensure_ascii=False),
+                json.dumps(audit_result, ensure_ascii=False),
+            )
+
+    async def update_feedback(
+        self,
+        proposal_id: str,
+        accepted: bool,
+        performance_after: dict[str, Any] | None = None,
+    ) -> bool:
+        """Record user feedback on a proposal. Returns True if proposal found."""
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(
+                """
+                UPDATE proposals
+                SET accepted = $2,
+                    performance_after = $3::jsonb,
+                    feedback_at = NOW()
+                WHERE id = $1::uuid
+                """,
+                uuid.UUID(proposal_id),
+                accepted,
+                json.dumps(performance_after or {}),
+            )
+            updated = int(result.split()[-1]) if result else 0
+            return updated > 0

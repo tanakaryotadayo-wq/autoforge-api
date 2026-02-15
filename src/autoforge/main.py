@@ -9,11 +9,19 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import structlog
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
 from .adapters.embedder import OpenAIEmbedder
 from .adapters.llm_client import TokenAwareLLMClient
+from .adapters.metrics import (
+    active_proposals,
+    audit_results_total,
+    facts_learned_total,
+    http_request_duration,
+    http_requests_total,
+)
 from .adapters.neo4j_graph import Neo4jGraphDB
 from .adapters.pgvector import PgVectorDB
 from .auth.jwt import (
@@ -24,6 +32,7 @@ from .auth.jwt import (
 )
 from .config import settings
 from .engine.context import ContextEngine
+from .logging import setup_logging
 from .models import (
     FeedbackRequest,
     HealthResponse,
@@ -39,6 +48,7 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize and cleanup all components."""
+    setup_logging()
     logger.info("autoforge_starting", version="7.0.0", backend=settings.llm_backend)
 
     # ── Initialize adapters ──
@@ -91,6 +101,29 @@ app.add_middleware(
 )
 
 
+# ── Middleware ──
+
+
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    """Track HTTP request metrics."""
+    start = time.time()
+    response = await call_next(request)
+    duration = time.time() - start
+
+    path = request.url.path
+    # Normalize paths to avoid cardinality explosion
+    if path.startswith("/v1/"):
+        path = "/v1/" + path.split("/")[2] if len(path.split("/")) > 2 else path
+
+    http_requests_total.labels(
+        method=request.method, path=path, status=response.status_code
+    ).inc()
+    http_request_duration.labels(method=request.method, path=path).observe(duration)
+
+    return response
+
+
 # ── Health ──
 
 
@@ -116,6 +149,15 @@ async def health():
 
     overall = "ok" if components.get("postgres") == "ok" else "degraded"
     return HealthResponse(status=overall, components=components)
+
+
+# ── Metrics (Prometheus scrape) ──
+
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus scrape endpoint."""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 # ── Auth ──
@@ -148,6 +190,7 @@ async def learn_fact(
         category=req.category,
         metadata=req.metadata,
     )
+    facts_learned_total.labels(tenant=tenant_id).inc()
     return {"doc_id": doc_id, "status": "learned"}
 
 
@@ -174,6 +217,8 @@ async def generate_proposal(
 ):
     """Generate AI proposal with RAG context + ECK audit."""
     engine: ContextEngine = app.state.engine
+    db: PgVectorDB = app.state.db
+    active_proposals.inc()
     start = time.time()
 
     try:
@@ -184,6 +229,21 @@ async def generate_proposal(
             account_history=req.account_history,
         )
         duration = time.time() - start
+
+        # Store proposal for feedback tracking
+        await db.store_proposal(
+            proposal_id=result["proposal_id"],
+            tenant_id=tenant_id,
+            domain=req.domain,
+            user_data=req.user_data,
+            proposal=result["proposal"],
+            audit_result=result["audit"].model_dump(),
+        )
+
+        # Track audit metrics
+        audit_status = "valid" if result["audit"].is_valid else "invalid"
+        audit_results_total.labels(status=audit_status).inc()
+
         logger.info("proposal_served", duration=round(duration, 2))
 
         return ProposeResponse(
@@ -195,16 +255,32 @@ async def generate_proposal(
     except Exception as e:
         logger.error("proposal_failed", error=str(e))
         return ProposeResponse(success=False, error=str(e))
+    finally:
+        active_proposals.dec()
 
 
 @app.post("/v1/feedback")
-async def record_feedback(req: FeedbackRequest):
-    """Record user feedback on a proposal for learning."""
-    # TODO: Phase 3 — store feedback and run learning cycle
+async def record_feedback(
+    req: FeedbackRequest,
+    tenant_id: str = Depends(get_tenant_id),
+):
+    """Record user feedback on a proposal and update for learning."""
+    db: PgVectorDB = app.state.db
+
+    found = await db.update_feedback(
+        proposal_id=req.proposal_id,
+        accepted=req.accepted,
+        performance_after=req.performance_after,
+    )
+
+    if not found:
+        raise HTTPException(404, f"Proposal {req.proposal_id} not found")
+
     logger.info(
         "feedback_recorded",
         proposal_id=req.proposal_id,
         accepted=req.accepted,
+        tenant=tenant_id,
     )
     return {"status": "recorded", "proposal_id": req.proposal_id}
 

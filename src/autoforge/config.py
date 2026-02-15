@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-small"
 
     # ── PostgreSQL + pgvector ──
-    database_url: str = "postgresql://autoforge:autoforge@localhost:5432/autoforge"
+    database_url: str = "postgresql://autoforge:autoforge@localhost:5433/autoforge"
 
     # ── Neo4j ──
     neo4j_uri: str = "bolt://localhost:7687"

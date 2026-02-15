@@ -1,6 +1,14 @@
 """
 Prometheus metrics for AutoForge — LLM, vector search, graph, and audit counters.
+Includes helper decorator for latency tracking.
 """
+from __future__ import annotations
+
+import time
+from collections.abc import Callable
+from functools import wraps
+from typing import Any
+
 from prometheus_client import Counter, Gauge, Histogram
 
 # ── LLM ──
@@ -13,6 +21,9 @@ llm_tokens_total = Counter(
 llm_duration_seconds = Histogram(
     "autoforge_llm_duration_seconds", "LLM call latency", ["model"]
 )
+llm_errors_total = Counter(
+    "autoforge_llm_errors_total", "LLM call errors", ["model"]
+)
 
 # ── Vector DB ──
 vector_search_total = Counter(
@@ -20,6 +31,9 @@ vector_search_total = Counter(
 )
 vector_search_duration = Histogram(
     "autoforge_vector_search_duration_seconds", "Vector search latency"
+)
+vector_upsert_total = Counter(
+    "autoforge_vector_upsert_total", "Total vector upserts"
 )
 
 # ── Graph DB ──
@@ -57,4 +71,12 @@ facts_cleaned_total = Counter(
 # ── Sessions ──
 active_proposals = Gauge(
     "autoforge_active_proposals", "Proposals in-flight"
+)
+
+# ── HTTP ──
+http_requests_total = Counter(
+    "autoforge_http_requests_total", "HTTP requests", ["method", "path", "status"]
+)
+http_request_duration = Histogram(
+    "autoforge_http_request_duration_seconds", "HTTP request latency", ["method", "path"]
 )

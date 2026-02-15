@@ -16,7 +16,7 @@ load_dotenv()
 
 
 async def seed(filepath: str, tenant_id: str = "default"):
-    dsn = os.getenv("DATABASE_URL")
+    dsn = os.getenv("DATABASE_URL", "postgresql://autoforge:autoforge@localhost:5433/autoforge")
     api_key = os.getenv("OPENAI_API_KEY") or os.getenv("DEEPSEEK_API_KEY")
     model = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 

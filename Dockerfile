@@ -21,4 +21,4 @@ CMD ["granian", \
     "--host", "0.0.0.0", \
     "--port", "8000", \
     "--workers", "2", \
-    "src.autoforge.main:app"]
+    "autoforge.main:app"]
