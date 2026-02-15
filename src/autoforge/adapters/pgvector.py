@@ -238,9 +238,20 @@ class PgVectorDB:
     async def get_proposals_history(
         self, tenant_id: str, limit: int = 20, offset: int = 0
     ) -> list[dict[str, Any]]:
-        """Get paginated proposal history for a tenant."""
-        # Proposal (not applied to preserve behavior):
-        # use guarded json.loads() fallback for partially corrupted rows.
+        """Get paginated proposal history for a tenant.
+
+        This method guards against partially corrupted JSON in DB columns by
+        falling back to a sensible default and logging a warning.
+        """
+        def _safe_load(text: str, fallback: Any) -> Any:
+            if text is None:
+                return fallback
+            try:
+                return json.loads(text)
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.warning("proposal_history_json_decode", error=str(e))
+                return fallback
+
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
@@ -255,16 +266,24 @@ class PgVectorDB:
                 limit,
                 offset,
             )
-            return [
-                {
-                    "id": row["id"],
-                    "domain": row["domain"],
-                    "user_data": json.loads(row["user_data"]),
-                    "proposal": json.loads(row["proposal"]),
-                    "audit_result": json.loads(row["audit_result"]),
-                    "accepted": row["accepted"],
-                    "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-                    "feedback_at": row["feedback_at"].isoformat() if row["feedback_at"] else None,
-                }
-                for row in rows
-            ]
+
+            result: list[dict[str, Any]] = []
+            for row in rows:
+                user_data = _safe_load(row["user_data"], {})
+                proposal = _safe_load(row["proposal"], {})
+                audit_result = _safe_load(row["audit_result"], {})
+
+                result.append(
+                    {
+                        "id": row["id"],
+                        "domain": row["domain"],
+                        "user_data": user_data,
+                        "proposal": proposal,
+                        "audit_result": audit_result,
+                        "accepted": row["accepted"],
+                        "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                        "feedback_at": row["feedback_at"].isoformat() if row["feedback_at"] else None,
+                    }
+                )
+
+            return result

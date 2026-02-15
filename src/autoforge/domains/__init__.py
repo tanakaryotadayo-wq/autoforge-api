@@ -7,21 +7,30 @@ from __future__ import annotations
 
 from types import ModuleType
 from typing import Any
+import importlib
+import structlog
 
 from ..models import AuditResult
 
-# Import domain modules
-from . import ad_optimization, customer_support, music_production, sales
+logger = structlog.get_logger()
 
-_REGISTRY: dict[str, ModuleType] = {
-    "ad_optimization": ad_optimization,
-    "music_production": music_production,
-    "sales": sales,
-    "customer_support": customer_support,
-}
+# Dynamically import domain modules. If a module fails to import we log a
+# warning and continue; this allows the application to start even if a
+# non-critical domain module has issues.
+_REGISTRY: dict[str, ModuleType] = {}
+_DOMAIN_MODULES = [
+    "ad_optimization",
+    "music_production",
+    "sales",
+    "customer_support",
+]
 
-# Proposal (not applied to preserve behavior):
-# wrap module imports with logging + graceful fallback on import failures.
+for _name in _DOMAIN_MODULES:
+    try:
+        mod = importlib.import_module(f".{_name}", package=__package__)
+        _REGISTRY[_name] = mod
+    except Exception as e:
+        logger.warning("domain_import_failed", domain=_name, error=str(e))
 
 # Default prompt for unknown domains
 _DEFAULT_PROMPT = (
@@ -29,7 +38,7 @@ _DEFAULT_PROMPT = (
     "データに基づいた具体的な提案をJSON形式で生成してください。"
     '出力形式: {"recommendations": [{"type": str, "action": str, '
     '"reason": str, "expected_impact": str, "priority": "high|medium|low", '
-    '"specific_values": {}}], "summary": str, "risk_assessment": str}'
+    '"specific_values": {}},], "summary": str, "risk_assessment": str}'
 )
 
 
