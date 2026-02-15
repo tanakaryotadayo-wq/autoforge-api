@@ -3,6 +3,7 @@
 Knowledge Seed Script — load industry knowledge into AutoForge.
 Usage: python scripts/seed_knowledge.py --file data/industry_knowledge.json
 """
+
 import argparse
 import asyncio
 import json

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """PostgreSQL + pgvector table initialization."""
+
 import asyncio
 import os
 
