@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import time
 from contextlib import asynccontextmanager
-import asyncpg
 
 import structlog
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -300,27 +299,29 @@ async def trigger_cleanup(user_id: str = Depends(get_current_user)):
 # ── Business Layer ──
 
 
-@app.get("/v1/domains", response_model="DomainsResponse")
+@app.get("/v1/domains")
 async def list_domains():
     """List all available domains with descriptions."""
     from .domains import list_domains as get_domains
 
+    # Proposal (not applied to preserve behavior):
+    # add response_model=DomainsResponse for stricter response validation.
     return {"domains": get_domains()}
 
 
-@app.get("/v1/stats", response_model="StatsResponse")
+@app.get("/v1/stats")
 async def tenant_stats(tenant_id: str = Depends(get_tenant_id)):
     """Get tenant-level statistics."""
     db: PgVectorDB = app.state.db
-    try:
-        stats = await db.get_stats(tenant_id)
-        return stats
-    except (asyncpg.PostgresError, OSError) as e:
-        logger.error("stats_db_unavailable", error=str(e))
-        raise HTTPException(status_code=503, detail="Database unavailable")
+    # Proposal (not applied to preserve behavior):
+    # catch DB connectivity errors and convert them to HTTP 503.
+    # Proposal (not applied to preserve behavior):
+    # add response_model=StatsResponse for stricter response validation.
+    stats = await db.get_stats(tenant_id)
+    return stats
 
 
-@app.get("/v1/proposals/history", response_model="ProposalsHistoryResponse")
+@app.get("/v1/proposals/history")
 async def proposals_history(
     limit: int = 20,
     offset: int = 0,
@@ -328,9 +329,9 @@ async def proposals_history(
 ):
     """Get paginated proposal history for the tenant."""
     db: PgVectorDB = app.state.db
-    try:
-        proposals = await db.get_proposals_history(tenant_id, limit=limit, offset=offset)
-        return {"proposals": proposals, "limit": limit, "offset": offset}
-    except (asyncpg.PostgresError, OSError) as e:
-        logger.error("proposals_history_db_unavailable", error=str(e))
-        raise HTTPException(status_code=503, detail="Database unavailable")
+    # Proposal (not applied to preserve behavior):
+    # catch DB connectivity errors and convert them to HTTP 503.
+    # Proposal (not applied to preserve behavior):
+    # add response_model=ProposalsHistoryResponse for stricter response validation.
+    proposals = await db.get_proposals_history(tenant_id, limit=limit, offset=offset)
+    return {"proposals": proposals, "limit": limit, "offset": offset}

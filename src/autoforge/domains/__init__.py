@@ -7,30 +7,21 @@ from __future__ import annotations
 
 from types import ModuleType
 from typing import Any
-import importlib
-import structlog
 
 from ..models import AuditResult
 
-logger = structlog.get_logger()
+# Import domain modules
+from . import ad_optimization, customer_support, music_production, sales
 
-# Dynamically import domain modules. If a module fails to import we log a
-# warning and continue; this allows the application to start even if a
-# non-critical domain module has issues.
-_REGISTRY: dict[str, ModuleType] = {}
-_DOMAIN_MODULES = [
-    "ad_optimization",
-    "music_production",
-    "sales",
-    "customer_support",
-]
+_REGISTRY: dict[str, ModuleType] = {
+    "ad_optimization": ad_optimization,
+    "music_production": music_production,
+    "sales": sales,
+    "customer_support": customer_support,
+}
 
-for _name in _DOMAIN_MODULES:
-    try:
-        mod = importlib.import_module(f".{_name}", package=__package__)
-        _REGISTRY[_name] = mod
-    except Exception as e:
-        logger.warning("domain_import_failed", domain=_name, error=str(e))
+# Proposal (not applied to preserve behavior):
+# wrap module imports with logging + graceful fallback on import failures.
 
 # Default prompt for unknown domains
 _DEFAULT_PROMPT = (
