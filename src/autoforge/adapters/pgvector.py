@@ -18,16 +18,6 @@ from .metrics import vector_search_duration, vector_search_total, vector_upsert_
 logger = structlog.get_logger()
 
 
-def _safe_json_loads(value: str | None) -> dict[str, Any]:
-    if not value:
-        return {}
-    try:
-        parsed = json.loads(value)
-    except json.JSONDecodeError:
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
-
-
 class PgVectorDB:
     """PostgreSQL + pgvector backed vector store with multi-tenant support."""
 
@@ -249,6 +239,8 @@ class PgVectorDB:
         self, tenant_id: str, limit: int = 20, offset: int = 0
     ) -> list[dict[str, Any]]:
         """Get paginated proposal history for a tenant."""
+        # Proposal (not applied to preserve behavior):
+        # use guarded json.loads() fallback for partially corrupted rows.
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
@@ -267,9 +259,9 @@ class PgVectorDB:
                 {
                     "id": row["id"],
                     "domain": row["domain"],
-                    "user_data": _safe_json_loads(row["user_data"]),
-                    "proposal": _safe_json_loads(row["proposal"]),
-                    "audit_result": _safe_json_loads(row["audit_result"]),
+                    "user_data": json.loads(row["user_data"]),
+                    "proposal": json.loads(row["proposal"]),
+                    "audit_result": json.loads(row["audit_result"]),
                     "accepted": row["accepted"],
                     "created_at": row["created_at"].isoformat() if row["created_at"] else None,
                     "feedback_at": row["feedback_at"].isoformat() if row["feedback_at"] else None,

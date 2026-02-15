@@ -5,30 +5,23 @@ Each domain module exports `SYSTEM_PROMPT` and `audit(proposal) -> AuditResult`.
 
 from __future__ import annotations
 
-from importlib import import_module
 from types import ModuleType
 from typing import Any
 
-import structlog
-
 from ..models import AuditResult
 
-logger = structlog.get_logger()
+# Import domain modules
+from . import ad_optimization, customer_support, music_production, sales
 
+_REGISTRY: dict[str, ModuleType] = {
+    "ad_optimization": ad_optimization,
+    "music_production": music_production,
+    "sales": sales,
+    "customer_support": customer_support,
+}
 
-def _load_domain_module(domain_name: str) -> ModuleType | None:
-    try:
-        return import_module(f".{domain_name}", package=__name__)
-    except Exception as exc:
-        logger.warning("domain_import_failed", domain=domain_name, error=str(exc))
-        return None
-
-
-_REGISTRY: dict[str, ModuleType] = {}
-for _domain in ("ad_optimization", "music_production", "sales", "customer_support"):
-    _module = _load_domain_module(_domain)
-    if _module:
-        _REGISTRY[_domain] = _module
+# Proposal (not applied to preserve behavior):
+# wrap module imports with logging + graceful fallback on import failures.
 
 # Default prompt for unknown domains
 _DEFAULT_PROMPT = (
