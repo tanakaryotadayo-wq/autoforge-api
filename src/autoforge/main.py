@@ -2,16 +2,16 @@
 AutoForge API v7.0 — FastAPI application.
 Granian-powered, multi-tenant, DeepSeek-ready.
 """
+
 from __future__ import annotations
 
 import time
 from contextlib import asynccontextmanager
-from typing import Any
 
 import structlog
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from .adapters.embedder import OpenAIEmbedder
 from .adapters.llm_client import TokenAwareLLMClient
@@ -28,7 +28,6 @@ from .auth.jwt import (
     create_access_token,
     get_current_user,
     get_tenant_id,
-    verify_password,
 )
 from .config import settings
 from .engine.context import ContextEngine
@@ -57,9 +56,7 @@ async def lifespan(app: FastAPI):
 
     graph_db: Neo4jGraphDB | None = None
     try:
-        graph_db = Neo4jGraphDB(
-            settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password
-        )
+        graph_db = Neo4jGraphDB(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password)
         await graph_db.connect()
     except Exception as e:
         logger.warning("neo4j_unavailable", error=str(e))
@@ -116,9 +113,7 @@ async def metrics_middleware(request: Request, call_next):
     if path.startswith("/v1/"):
         path = "/v1/" + path.split("/")[2] if len(path.split("/")) > 2 else path
 
-    http_requests_total.labels(
-        method=request.method, path=path, status=response.status_code
-    ).inc()
+    http_requests_total.labels(method=request.method, path=path, status=response.status_code).inc()
     http_request_duration.labels(method=request.method, path=path).observe(duration)
 
     return response

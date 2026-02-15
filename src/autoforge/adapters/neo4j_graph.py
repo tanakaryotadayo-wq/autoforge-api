@@ -2,12 +2,16 @@
 Neo4j GraphDB adapter — entity/relation management + graph expansion.
 Implements GraphDB protocol.
 """
+
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import structlog
 from neo4j import AsyncDriver, AsyncGraphDatabase
+
+from .metrics import graph_entities_upserted, graph_expand_duration, graph_expand_total
 
 logger = structlog.get_logger()
 
@@ -23,9 +27,7 @@ class Neo4jGraphDB:
         self.driver: AsyncDriver | None = None
 
     async def connect(self) -> None:
-        self.driver = AsyncGraphDatabase.driver(
-            self.uri, auth=(self.user, self.password)
-        )
+        self.driver = AsyncGraphDatabase.driver(self.uri, auth=(self.user, self.password))
         async with self.driver.session(database=self.database) as session:
             await session.run(
                 "CREATE CONSTRAINT IF NOT EXISTS FOR (n:Entity) REQUIRE n.name IS UNIQUE"
@@ -45,6 +47,7 @@ class Neo4jGraphDB:
                     name=ent["name"],
                     type=ent.get("type", "unknown"),
                 )
+                graph_entities_upserted.inc(len(entities))
         logger.debug("entities_upserted", count=len(entities))
 
     async def upsert_relations(self, relations: list[tuple[str, str, str]]) -> None:
@@ -69,6 +72,8 @@ class Neo4jGraphDB:
     async def expand(self, seed_entities: list[str], depth: int = 1) -> list[str]:
         if not seed_entities:
             return []
+        graph_expand_total.inc()
+        start = time.time()
         async with self.driver.session(database=self.database) as session:
             result = await session.run(
                 f"""
@@ -82,6 +87,7 @@ class Neo4jGraphDB:
                 seeds=seed_entities,
             )
             records = await result.fetch(50)
+            graph_expand_duration.observe(time.time() - start)
             return [r["name"] for r in records]
 
     async def close(self) -> None:

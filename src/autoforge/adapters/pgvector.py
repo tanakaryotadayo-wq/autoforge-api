@@ -2,6 +2,7 @@
 pgvector adapter — PostgreSQL + pgvector for RAG vector search.
 Implements VectorDB protocol. Wired with Prometheus metrics.
 """
+
 from __future__ import annotations
 
 import json

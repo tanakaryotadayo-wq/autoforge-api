@@ -1,9 +1,10 @@
 """
 JWT authentication + tenant extraction middleware.
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import Depends, HTTPException, Request, status
@@ -22,7 +23,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now(UTC) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode["exp"] = expire
     return jwt.encode(to_encode, settings.secret_key, algorithm=ALGORITHM)
 
@@ -46,7 +47,7 @@ async def get_current_user(token: str | None = Depends(oauth2_scheme)) -> str:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token")
         return user_id
     except JWTError:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token") from None
 
 
 def get_tenant_id(request: Request) -> str:

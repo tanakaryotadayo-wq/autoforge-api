@@ -2,6 +2,7 @@
 AutoForge v7.0 Configuration
 Granian + uv + DeepSeek + structlog
 """
+
 from __future__ import annotations
 
 from pydantic_settings import BaseSettings
@@ -55,7 +56,7 @@ class Settings(BaseSettings):
     embedding_concurrency: int = 2
 
     # ── Logging ──
-    log_level: str = "info"
+    log_level: str = "INFO"
     log_json: bool = False
 
     # ── Server ──

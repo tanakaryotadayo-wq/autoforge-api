@@ -1,4 +1,5 @@
 """Protocol definitions — all adapters implement these interfaces."""
+
 from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
@@ -6,10 +7,38 @@ from typing import Any, Protocol, runtime_checkable
 
 @runtime_checkable
 class VectorDB(Protocol):
-    async def upsert(self, doc_id: str, content: str, vector: list[float], metadata: dict[str, Any]) -> None: ...
-    async def search(self, vector: list[float], top_k: int, filter_metadata: dict[str, Any] | None = None) -> list[dict[str, Any]]: ...
+    async def upsert(
+        self,
+        doc_id: str,
+        content: str,
+        vector: list[float],
+        metadata: dict[str, Any],
+    ) -> None: ...
+
+    async def search(
+        self,
+        vector: list[float],
+        top_k: int = 5,
+        filter_metadata: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]: ...
+
     async def delete(self, doc_id: str) -> None: ...
     async def increment_counter(self, doc_ids: list[str]) -> None: ...
+    async def store_proposal(
+        self,
+        proposal_id: str,
+        tenant_id: str,
+        domain: str,
+        user_data: dict[str, Any],
+        proposal: dict[str, Any],
+        audit_result: dict[str, Any],
+    ) -> None: ...
+    async def update_feedback(
+        self,
+        proposal_id: str,
+        accepted: bool,
+        performance_after: dict[str, Any] | None = None,
+    ) -> bool: ...
 
 
 @runtime_checkable

@@ -1,11 +1,11 @@
 """Pydantic models for AutoForge facts, proposals, and API schemas."""
+
 from __future__ import annotations
 
 import time
 from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ── Domain Models ──
 
@@ -46,6 +46,7 @@ class QueryRequest(BaseModel):
 
 class ProposeRequest(BaseModel):
     """広告ツール等から送られる提案リクエスト"""
+
     user_data: dict[str, Any]
     account_history: dict[str, Any] = Field(default_factory=dict)
     domain: str = "ad_optimization"  # ドメイン（将来の汎用化用）

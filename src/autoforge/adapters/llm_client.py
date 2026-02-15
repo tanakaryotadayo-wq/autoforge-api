@@ -2,6 +2,7 @@
 LLM Client — DeepSeek (default) or OpenAI, with token-aware truncation.
 Implements LLMClient protocol. Wired with Prometheus metrics.
 """
+
 from __future__ import annotations
 
 import asyncio

@@ -1,6 +1,7 @@
 """
 structlog configuration — JSON or console output, driven by settings.
 """
+
 from __future__ import annotations
 
 import logging
@@ -24,9 +25,7 @@ def setup_logging() -> None:
     ]
 
     if settings.log_json:
-        renderer: structlog.types.Processor = structlog.processors.JSONRenderer(
-            ensure_ascii=False
-        )
+        renderer: structlog.types.Processor = structlog.processors.JSONRenderer(ensure_ascii=False)
     else:
         renderer = structlog.dev.ConsoleRenderer(colors=sys.stderr.isatty())
 

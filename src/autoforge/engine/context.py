@@ -2,6 +2,7 @@
 ContextEngine — the brain of AutoForge.
 HyDE + multi-hop RAG + GraphRAG + relation extraction + ECK audit.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -86,7 +87,11 @@ class ContextEngine:
             return cached
 
         result = await self.llm.chat_json(
-            system='テキストからキーエンティティを抽出し、{"entities": ["entity1", "entity2"]} 形式のJSONで返してください。最大5個まで。',
+            system=(
+                "テキストからキーエンティティを抽出し、"
+                '{"entities": ["entity1", "entity2"]} 形式のJSONで返してください。'
+                "最大5個まで。"
+            ),
             user=text[:800],
         )
         entities = result.get("entities", [])[:5]
@@ -122,19 +127,24 @@ class ContextEngine:
 
         # Batch rerank
         doc_summaries = "\n".join(
-            f"[{i}] {d['content'][:150]}" for i, d in enumerate(docs[:settings.rerank_candidates_max])
+            f"[{i}] {d['content'][:150]}"
+            for i, d in enumerate(docs[: settings.rerank_candidates_max])
         )
 
         result = await self.llm.chat_json(
-            system=f'以下の検索結果をクエリとの関連度で並べ替え、上位{settings.rerank_final_limit}件のインデックスをJSON配列で返してください。形式: {{"ranked": [0, 3, 1, ...]}}',
+            system=(
+                "以下の検索結果をクエリとの関連度で並べ替え、"
+                f"上位{settings.rerank_final_limit}件のインデックスをJSON配列で"
+                '返してください。形式: {"ranked": [0, 3, 1, ...]}'
+            ),
             user=f"クエリ: {query}\n\n検索結果:\n{doc_summaries}",
         )
         ranked_indices = result.get("ranked", list(range(len(docs))))
         reranked = []
-        for idx in ranked_indices[:settings.rerank_final_limit]:
+        for idx in ranked_indices[: settings.rerank_final_limit]:
             if isinstance(idx, int) and 0 <= idx < len(docs):
                 reranked.append(docs[idx])
-        return reranked or docs[:settings.rerank_final_limit]
+        return reranked or docs[: settings.rerank_final_limit]
 
     # ── Multi-hop Search ──
 
@@ -163,7 +173,7 @@ class ContextEngine:
             all_docs[doc["id"]] = doc
 
         # Step 3: Multi-hop expansion
-        for hop in range(settings.max_hops):
+        for _hop in range(settings.max_hops):
             if not all_docs:
                 break
 
@@ -268,14 +278,19 @@ class ContextEngine:
 
         # Search for relevant knowledge
         context_docs = await self.search(query, tenant_id=tenant_id)
-        context_text = "\n".join(
-            d["content"][:300] for d in context_docs[:10]
-        )[:settings.context_max_chars]
+        context_text = "\n".join(d["content"][:300] for d in context_docs[:10])[
+            : settings.context_max_chars
+        ]
 
         # Build proposal prompt
         system_prompt = self._get_domain_prompt(domain)
+        context_part = (
+            context_text
+            if context_text.strip()
+            else "(関連知識なし — 一般的な分析に基づいて提案してください)"
+        )
         user_prompt = f"""## ナレッジベースからの関連知識
-{context_text if context_text.strip() else "(関連知識なし — 一般的な分析に基づいて提案してください)"}
+    {context_part}
 
 ## ユーザーデータ
 {json.dumps(user_data, ensure_ascii=False, indent=2)[:2000]}
@@ -368,7 +383,14 @@ FL Studio Mobile (FLM) のパラメータを熟知しており、ジャンル特
     "bpm": 145,
     "key": "A minor",
     "time_signature": "4/4",
-    "sections": ["intro_8bar", "buildup_16bar", "drop_16bar", "breakdown_8bar", "drop2_16bar", "outro_8bar"],
+        "sections": [
+            "intro_8bar",
+            "buildup_16bar",
+            "drop_16bar",
+            "breakdown_8bar",
+            "drop2_16bar",
+            "outro_8bar"
+        ],
     "total_bars": 72,
     "channels": ["kick", "bass", "lead", "pad", "hihat", "clap", "fx"]
   },
@@ -404,9 +426,7 @@ FL Studio Mobile (FLM) のパラメータを熟知しており、ジャンル特
                 warnings.append("全ての提案が守備的です。攻めの提案を追加してください。")
 
             # Rule 2: Check for specific values
-            missing_values = [
-                r for r in recommendations if not r.get("specific_values")
-            ]
+            missing_values = [r for r in recommendations if not r.get("specific_values")]
             if missing_values:
                 warnings.append(f"{len(missing_values)}件の提案に具体的な数値がありません")
 
@@ -414,38 +434,23 @@ FL Studio Mobile (FLM) のパラメータを熟知しており、ジャンル特
             for r in recommendations:
                 vals = r.get("specific_values", {})
                 bid_change = vals.get("bid_change_percent")
-                if bid_change is not None:
-                    if abs(bid_change) > 50:
-                        errors.append(
-                            f"入札変更率が{bid_change}%は極端すぎます（上限±50%）"
-                        )
+                if bid_change is not None and abs(bid_change) > 50:
+                    errors.append(f"入札変更率が{bid_change}%は極端すぎます（上限±50%）")
 
             # Rule 4: Budget changes should be gradual
             for r in recommendations:
                 vals = r.get("specific_values", {})
                 budget_change = vals.get("budget_change_percent")
-                if budget_change is not None:
-                    if abs(budget_change) > 30:
-                        warnings.append(
-                            f"予算変更率{budget_change}%は急激です（推奨±30%以内）"
-                        )
+                if budget_change is not None and abs(budget_change) > 30:
+                    warnings.append(f"予算変更率{budget_change}%は急激です（推奨±30%以内）")
 
         elif domain == "music_production":
-            # Genre-specific BPM ranges
-            bpm_ranges = {
-                "psytrance": (138, 155), "techno": (125, 150),
-                "acid": (120, 140), "house": (118, 132),
-                "drum_and_bass": (160, 180), "ambient": (60, 100),
-                "lo-fi": (70, 95),
-            }
-
             track = proposal.get("track_structure", {})
             bpm = track.get("bpm")
 
             # Rule 1: BPM sanity check
-            if bpm is not None:
-                if bpm < 30 or bpm > 300:
-                    errors.append(f"BPM {bpm} は範囲外です（30-300）")
+            if bpm is not None and (bpm < 30 or bpm > 300):
+                errors.append(f"BPM {bpm} は範囲外です（30-300）")
 
             # Rule 2: Check specific_values on recommendations
             for r in recommendations:
@@ -474,7 +479,9 @@ FL Studio Mobile (FLM) のパラメータを熟知しており、ジャンル特
             # Rule 4: Channel count sanity
             channels = track.get("channels", [])
             if len(channels) > 16:
-                warnings.append(f"チャンネル数 {len(channels)} は FLM の制限を超える可能性があります")
+                warnings.append(
+                    f"チャンネル数 {len(channels)} は FLM の制限を超える可能性があります"
+                )
 
         return AuditResult(
             is_valid=len(errors) == 0,
