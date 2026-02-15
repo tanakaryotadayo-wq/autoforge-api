@@ -294,3 +294,34 @@ async def trigger_cleanup(user_id: str = Depends(get_current_user)):
         min_importance=settings.cleanup_min_importance,
     )
     return {"deleted": deleted}
+
+
+# ── Business Layer ──
+
+
+@app.get("/v1/domains")
+async def list_domains():
+    """List all available domains with descriptions."""
+    from .domains import list_domains as get_domains
+
+    return {"domains": get_domains()}
+
+
+@app.get("/v1/stats")
+async def tenant_stats(tenant_id: str = Depends(get_tenant_id)):
+    """Get tenant-level statistics."""
+    db: PgVectorDB = app.state.db
+    stats = await db.get_stats(tenant_id)
+    return stats
+
+
+@app.get("/v1/proposals/history")
+async def proposals_history(
+    limit: int = 20,
+    offset: int = 0,
+    tenant_id: str = Depends(get_tenant_id),
+):
+    """Get paginated proposal history for the tenant."""
+    db: PgVectorDB = app.state.db
+    proposals = await db.get_proposals_history(tenant_id, limit=limit, offset=offset)
+    return {"proposals": proposals, "limit": limit, "offset": offset}

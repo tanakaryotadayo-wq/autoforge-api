@@ -209,3 +209,60 @@ class PgVectorDB:
             )
             updated = int(result.split()[-1]) if result else 0
             return updated > 0
+
+    # ── Business Layer Queries ──
+
+    async def get_stats(self, tenant_id: str) -> dict[str, Any]:
+        """Get tenant-level statistics."""
+        async with self.pool.acquire() as conn:
+            facts_count = await conn.fetchval(
+                "SELECT COUNT(*) FROM documents WHERE metadata->>'tenant_id' = $1",
+                tenant_id,
+            )
+            proposals_count = await conn.fetchval(
+                "SELECT COUNT(*) FROM proposals WHERE tenant_id = $1",
+                tenant_id,
+            )
+            accepted_count = await conn.fetchval(
+                "SELECT COUNT(*) FROM proposals WHERE tenant_id = $1 AND accepted = TRUE",
+                tenant_id,
+            )
+            return {
+                "tenant_id": tenant_id,
+                "total_facts": facts_count or 0,
+                "total_proposals": proposals_count or 0,
+                "accepted_proposals": accepted_count or 0,
+                "acceptance_rate": round((accepted_count or 0) / max(proposals_count or 1, 1), 3),
+            }
+
+    async def get_proposals_history(
+        self, tenant_id: str, limit: int = 20, offset: int = 0
+    ) -> list[dict[str, Any]]:
+        """Get paginated proposal history for a tenant."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id::text, domain, user_data::text, proposal::text,
+                       audit_result::text, accepted, created_at, feedback_at
+                FROM proposals
+                WHERE tenant_id = $1
+                ORDER BY created_at DESC
+                LIMIT $2 OFFSET $3
+                """,
+                tenant_id,
+                limit,
+                offset,
+            )
+            return [
+                {
+                    "id": row["id"],
+                    "domain": row["domain"],
+                    "user_data": json.loads(row["user_data"]),
+                    "proposal": json.loads(row["proposal"]),
+                    "audit_result": json.loads(row["audit_result"]),
+                    "accepted": row["accepted"],
+                    "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                    "feedback_at": row["feedback_at"].isoformat() if row["feedback_at"] else None,
+                }
+                for row in rows
+            ]

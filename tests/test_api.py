@@ -1,4 +1,5 @@
 """API integration tests for AutoForge."""
+
 from __future__ import annotations
 
 import os
@@ -19,10 +20,13 @@ LLM_TESTS_ENABLED = bool(os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_
 
 @pytest.fixture
 async def client() -> AsyncIterator[AsyncClient]:
-    async with app.router.lifespan_context(app), AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-    ) as ac:
+    async with (
+        app.router.lifespan_context(app),
+        AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac,
+    ):
         yield ac
 
 
