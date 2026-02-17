@@ -6,3 +6,12 @@ __pycache__/
 dist/
 *.egg-info/
 .pytest_cache/
+
+# macOS
+.DS_Store
+
+# local runtime artifacts
+.granian*.log
+.granian*.pid
+.uvicorn*.log
+.uvicorn*.pid

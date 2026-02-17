@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "lint",
+      "type": "shell",
+      "command": "/opt/homebrew/bin/ruff check src tests scripts --force-exclude"
+    },
+    {
+      "label": "format",
+      "type": "shell",
+      "command": "/opt/homebrew/bin/ruff format src tests scripts"
+    },
+    {
+      "label": "test:unit",
+      "type": "shell",
+      "command": ".venv/bin/pytest tests/test_unit.py -v"
+    },
+    {
+      "label": "qa:all",
+      "dependsOn": [
+        "lint",
+        "format",
+        "test:unit"
+      ],
+      "dependsOrder": "sequence"
+    }
+  ]
+}
